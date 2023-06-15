@@ -30,8 +30,8 @@ class CustomLexer(RegexLexer):
         'root': [
             (r"#!.*", Comment.Hashbang), 
             include('expdef'),
-            include('literal'),
             include('syntax'),
+            include('literal'),
             include('string'),
             (r"\{\{", DirectDef, 'ddef'), 
         ],
