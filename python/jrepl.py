@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import os
 import re
 import sys
 import signal
@@ -23,10 +22,13 @@ from prompt_toolkit import print_formatted_text as fprint
 
 from prompt_toolkit.styles import Style
 
+from pathlib import Path
+
 jellybeans = Style.from_dict({
     "pygments.name": "fg:#ffd787",  # noun
     "pygments.name.tag": "fg:#ffaf5f",  # rank
     "pygments.name.label": "fg:#5f8787", # control
+    "pygments.name.function": "fg:#5fd7ff", # header
     "pygments.name.decorator": "fg:#5fd7ff", # def
     "pygments.comment.hashbang": "fg:#87afd7", # hashbang
     "pygments.comment": "fg:#808080", # comment
@@ -65,7 +67,12 @@ class J:
 
 
 j = J(load_profile=True)
-j.eval("load 'repr.ijs'")
+
+CURPATH = Path(__file__).parent
+localpath = lambda fname: CURPATH.joinpath(fname)
+
+repr_ijs = localpath('repr.ijs')
+j.eval(f"load '{repr_ijs}'")
 
 
 def put(string):
@@ -74,7 +81,7 @@ def put(string):
 
 session = PromptSession()
 
-JLexer = load_lexer_from_file('jlexer.py').__class__
+JLexer = load_lexer_from_file(localpath('jlexer.py')).__class__
 jlex = PygmentsLexer(JLexer)
 
 style_name = "one-dark"
@@ -173,7 +180,6 @@ while True:
     if opts["colout"]:
         tokens = lex(out, lexer=JLexer())
         fprint(PygmentsTokens(tokens), style=style, end="")
-        # put(highlight(out, JLexer(), term_fmt(style=style_name)))
     else:
         put(out)
     put(hr())
