@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 
+import os
 import re
-import sys
-import signal
 
 from ctypes import CDLL, c_void_p, c_char_p
 
-from pygments import highlight, lex
+from pygments import lex
 from pygments.lexers import load_lexer_from_file
-from pygments.formatters import Terminal256Formatter as term_fmt
 from pygments.styles import get_style_by_name
 from pygments.console import colorize
 
@@ -22,24 +20,28 @@ from prompt_toolkit import print_formatted_text as fprint
 
 from prompt_toolkit.styles import Style
 
+from prompt_toolkit.history import InMemoryHistory
+
 from pathlib import Path
 
-jellybeans = Style.from_dict({
-    "pygments.name": "fg:#ffd787",  # noun
-    "pygments.name.tag": "fg:#ffaf5f",  # rank
-    "pygments.name.label": "fg:#5f8787", # control
-    "pygments.name.function": "fg:#5fd7ff", # header
-    "pygments.name.decorator": "fg:#5fd7ff", # def
-    "pygments.comment.hashbang": "fg:#87afd7", # hashbang
-    "pygments.comment": "fg:#808080", # comment
-    "pygments.operator": "fg:#8787af", # verb
-    "pygments.keyword": "fg:#d7afff", # conjunction
-    "pygments.keyword.type": "fg:#ffaf5f",  # adverb
-    "pygments.literal.string": "fg:#87af5f", # string
-    "pygments.punctuation": "fg:#adadad",
-    "pygments.punctuation.marker": "fg:#87afd7", # parens
-    "pygments.literal.number": "fg:#d75f5f", # number
-})
+jellybeans = Style.from_dict(
+    {
+        "pygments.name": "fg:#ffd787",  # noun
+        "pygments.name.tag": "fg:#ffaf5f",  # rank
+        "pygments.name.label": "fg:#5f8787",  # control
+        "pygments.name.function": "fg:#5fd7ff",  # header
+        "pygments.name.decorator": "fg:#5fd7ff",  # def
+        "pygments.comment.hashbang": "fg:#87afd7",  # hashbang
+        "pygments.comment": "fg:#808080",  # comment
+        "pygments.operator": "fg:#8787af",  # verb
+        "pygments.keyword": "fg:#d7afff",  # conjunction
+        "pygments.keyword.type": "fg:#ffaf5f",  # adverb
+        "pygments.literal.string": "fg:#87af5f",  # string
+        "pygments.punctuation": "fg:#adadad",
+        "pygments.punctuation.marker": "fg:#87afd7",  # parens
+        "pygments.literal.number": "fg:#d75f5f",  # number
+    }
+)
 
 J_BIN = "/opt/j9.5/bin"
 J_LIB = f"{J_BIN}/libj.so"
@@ -71,7 +73,7 @@ j = J(load_profile=True)
 CURPATH = Path(__file__).parent
 localpath = lambda fname: CURPATH.joinpath(fname)
 
-repr_ijs = localpath('repr.ijs')
+repr_ijs = localpath("repr.ijs")
 j.eval(f"load '{repr_ijs}'")
 
 
@@ -79,9 +81,14 @@ def put(string):
     print(string, end="")
 
 
-session = PromptSession()
+histfile = os.getenv("HOME") + "/.jhistory"
+with open(histfile) as fd:
+    _, *lines = fd.read().replace(r"\040", " ").splitlines()
+hist = InMemoryHistory(lines)
 
-JLexer = load_lexer_from_file(localpath('jlexer.py')).__class__
+session = PromptSession(history=hist)
+
+JLexer = load_lexer_from_file(localpath("jlexer.py")).__class__
 jlex = PygmentsLexer(JLexer)
 
 style_name = "one-dark"
@@ -109,6 +116,8 @@ put(colorize("yellow", j.eval("JVERSION")))
 put(hr())
 
 vals = {"on": True, "off": False}
+
+
 def setopt(key, val):
     old = ["off", "on"][opts[key]]
     opts[key] = vals[val]
@@ -134,13 +143,19 @@ def format_error(out):
                 line = re.sub("^\|\s+", s, line)
         msg.append(line)
     return "\n".join(msg)
- 
-j.eval('(9!:37) 0 _ 0 _')
+
+
+j.eval("(9!:37) 0 _ 0 _")
 
 while True:
     try:
         expr = session.prompt("   ", lexer=jlex, style=style, enable_suspend=True)
     except (KeyboardInterrupt, EOFError):
+        with open(histfile, "w") as fd:
+            print("_HiStOrY_V2_", file=fd)
+            for line in hist.get_strings():
+                print(line.replace(" ", r"\040"), file=fd)
+
         exit()
 
     if re_opts.match(expr):
@@ -160,7 +175,10 @@ while True:
         out = ""
         if opts["repr"]:
             ret = j.do(f"last_repl_ =. {expr}")
+            res = j.getr().strip()
             if ret == 0:
+                if len(res) > 0:  # eg. 'echo'
+                    print(res)
                 out = j.eval("Repr < 'last_repl_'")
                 j.do("last_repl_ =. (0$0)")
             else:
