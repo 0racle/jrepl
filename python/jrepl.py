@@ -32,7 +32,7 @@ jellybeans = Style.from_dict(
         "pygments.name.function": "fg:#5fd7ff",  # header
         "pygments.name.decorator": "fg:#5fd7ff",  # def
         "pygments.comment.hashbang": "fg:#87afd7",  # hashbang
-        "pygments.comment": "fg:#808080",  # comment
+        "pygments.comment": "bg:#808080 fg:#000000",  # comment
         "pygments.operator": "fg:#8787af",  # verb
         "pygments.keyword": "fg:#d7afff",  # conjunction
         "pygments.keyword.type": "fg:#ffaf5f",  # adverb
