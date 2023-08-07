@@ -81,9 +81,10 @@ def put(string):
     print(string, end="")
 
 
+convert = lambda x: x.replace(r'\040', ' ').replace(r'\134', '\\')
 histfile = os.getenv("HOME") + "/.jhistory"
 with open(histfile) as fd:
-    _, *lines = fd.read().replace(r"\040", " ").splitlines()
+    _, *lines = map(convert, fd.read().splitlines())
 hist = InMemoryHistory(lines)
 
 session = PromptSession(history=hist)
@@ -152,9 +153,10 @@ while True:
         expr = session.prompt("   ", lexer=jlex, style=style, enable_suspend=True)
     except (KeyboardInterrupt, EOFError):
         with open(histfile, "w") as fd:
+            cmap = {ord(' '): r'\040',  ord('\\'): r'\134'}
             print("_HiStOrY_V2_", file=fd)
             for line in hist.get_strings():
-                print(line.replace(" ", r"\040"), file=fd)
+                print(line.translate(cmap), file=fd)
 
         exit()
 
