@@ -34,7 +34,7 @@ jellybeans = Style.from_dict(
         "pygments.comment.hashbang": "fg:#87afd7",  # hashbang
         "pygments.comment": "bg:#808080 fg:#000000",  # comment
         "pygments.operator": "fg:#8787af",  # verb
-        "pygments.keyword": "fg:#d7afff",  # conjunction
+        "pygments.keyword": "fg:#d7afff nobold",  # conjunction
         "pygments.keyword.type": "fg:#ffaf5f",  # adverb
         "pygments.literal.string": "fg:#87af5f",  # string
         "pygments.punctuation": "fg:#adadad",
@@ -156,6 +156,8 @@ while True:
             cmap = {ord(' '): r'\040',  ord('\\'): r'\134'}
             print("_HiStOrY_V2_", file=fd)
             for line in hist.get_strings():
+                if re_opts.match(line):  # Don't add opts to history
+                    continue
                 print(line.translate(cmap), file=fd)
 
         exit()
@@ -170,7 +172,7 @@ while True:
         except:
             pass
 
-    if len(expr.strip()) == 0:
+    if len(expr.strip()) == 0 or re.match(r"^\s*NB\.(?![.:]).*", expr):
         continue
 
     try:
