@@ -2,6 +2,7 @@
 
 import os
 import re
+from configparser import ConfigParser, ExtendedInterpolation
 
 from ctypes import CDLL, c_void_p, c_char_p
 
@@ -24,28 +25,45 @@ from prompt_toolkit.history import InMemoryHistory
 
 from pathlib import Path
 
-jellybeans = Style.from_dict(
-    {
-        "pygments.name": "fg:#ffd787",  # noun
-        "pygments.name.tag": "fg:#ffaf5f",  # rank
-        "pygments.name.label": "fg:#5f8787",  # control
-        "pygments.name.function": "fg:#5fd7ff",  # header
-        "pygments.name.decorator": "fg:#5fd7ff",  # def
-        "pygments.comment.hashbang": "fg:#87afd7",  # hashbang
-        "pygments.comment": "bg:#808080 fg:#000000",  # comment
-        "pygments.operator": "fg:#8787af",  # verb
-        "pygments.keyword": "fg:#d7afff nobold",  # conjunction
-        "pygments.keyword.type": "fg:#ffaf5f",  # adverb
-        "pygments.literal.string": "fg:#87af5f",  # string
-        "pygments.punctuation": "fg:#adadad",
-        "pygments.punctuation.marker": "fg:#87afd7",  # parens
-        "pygments.literal.number": "fg:#d75f5f",  # number
-    }
-)
+CURPATH = Path(__file__).parent
+localpath = lambda fname: CURPATH.joinpath(fname)
 
-J_BIN = "/opt/j9.5/bin"
-J_LIB = f"{J_BIN}/libj.so"
+config = ConfigParser(interpolation=ExtendedInterpolation())
+config.read(localpath("jrepl.conf"))
+config["ENV"] = {}
+for key, value in os.environ.items():
+    try:
+        config["ENV"][key] = value
+    except ValueError:
+        pass
+
+colormap = {
+    "noun": "pygments.name",
+    "rank": "pygments.name.tag",
+    "control": "pygments.name.label",
+    "header": "pygments.name.function",
+    "def": "pygments.name.decorator",
+    "hashbang": "pygments.comment.hashbang",
+    "comment": "pygments.comment",
+    "verb": "pygments.operator",
+    "conjunction": "pygments.keyword",
+    "adverb": "pygments.keyword.type",
+    "string": "pygments.literal.string",
+    "punctuation": "pygments.punctuation",
+    "parens": "pygments.punctuation.marker",
+    "number": "pygments.literal.number",
+}
+
+colordict = {colormap[key]: config["colors"][key] for key in colormap.keys()}
+jellybeans = Style.from_dict(colordict)
+
+J_BIN = config["paths"]["jbinpath"]
 J_PRO = f"{J_BIN}/profile.ijs"
+
+if os.name == "posix":
+    J_LIB = f"{J_BIN}/libj.so"
+else:
+    J_LIB = f"{J_BIN}/j.dll"
 
 
 class J:
@@ -68,24 +86,30 @@ class J:
         return self.getr()
 
 
-j = J(load_profile=True)
-
-CURPATH = Path(__file__).parent
-localpath = lambda fname: CURPATH.joinpath(fname)
+try:
+    j = J(load_profile=True)
+except Exception as e:
+    print(e)
+    exit(1)
 
 repr_ijs = localpath("repr.ijs")
 j.eval(f"load '{repr_ijs}'")
+
+j.eval("(9!:7) {. Boxes_j_")
 
 
 def put(string):
     print(string, end="")
 
 
-convert = lambda x: x.replace(r'\040', ' ').replace(r'\134', '\\')
-histfile = os.getenv("HOME") + "/.jhistory"
-with open(histfile) as fd:
-    _, *lines = map(convert, fd.read().splitlines())
-hist = InMemoryHistory(lines)
+convert = lambda x: x.replace(r"\040", " ").replace(r"\134", "\\")
+histfile = config["paths"]["jhistory"]
+try:
+    with open(histfile) as fd:
+        _, *lines = map(convert, fd.read().splitlines())
+    hist = InMemoryHistory(lines)
+except:
+    hist = InMemoryHistory()
 
 session = PromptSession(history=hist)
 
@@ -153,7 +177,7 @@ while True:
         expr = session.prompt("   ", lexer=jlex, style=style, enable_suspend=True)
     except (KeyboardInterrupt, EOFError):
         with open(histfile, "w") as fd:
-            cmap = {ord(' '): r'\040',  ord('\\'): r'\134'}
+            cmap = {ord(" "): r"\040", ord("\\"): r"\134"}
             print("_HiStOrY_V2_", file=fd)
             for line in hist.get_strings():
                 if re_opts.match(line):  # Don't add opts to history
