@@ -28,7 +28,7 @@ class CustomLexer(RegexLexer):
 
     tokens = {
         'root': [
-            (r"#!.*", Comment.Hashbang), 
+            # (r"#!.*", Comment.Hashbang), 
             include('expdef'),
             include('syntax'),
             include('literal'),
@@ -139,6 +139,7 @@ class CustomLexer(RegexLexer):
             (r"\)[mdvac*]", DefHeader),
             (r"\)n", DefHeader, 'directstring'),
             (r"\}\}", DirectDef, '#pop'), 
+            (r"\{\{", DirectDef, '#push'), 
             include('unpack_in_def'),
             include('control'),
             include('args'),
