@@ -3,26 +3,18 @@
 import os
 import re
 from configparser import ConfigParser, ExtendedInterpolation
-
 from ctypes import CDLL, c_void_p, c_char_p
-
 from pygments import lex
 from pygments.lexers import load_lexer_from_file
 from pygments.styles import get_style_by_name
 from pygments.console import colorize
-
 from prompt_toolkit import PromptSession
 from prompt_toolkit.lexers import PygmentsLexer
-
 from prompt_toolkit.styles.pygments import style_from_pygments_cls
-
 from prompt_toolkit.formatted_text import PygmentsTokens
 from prompt_toolkit import print_formatted_text as fprint
-
 from prompt_toolkit.styles import Style
-
 from prompt_toolkit.history import InMemoryHistory
-
 from pathlib import Path
 
 CURPATH = Path(__file__).parent
@@ -123,7 +115,7 @@ style = jellybeans
 opts = {
     "hr": True,
     "repr": True,
-    "colout": True,
+    "col": True,
 }
 re_opts = re.compile(f"\)({'|'.join(opts.keys())})\s+(on|off)")
 
@@ -132,7 +124,7 @@ def hr():
     if not opts["hr"]:
         return ""
     line = j.eval("({. wcsize_j_ '') # 7 u: '╍'")
-    if opts["colout"]:
+    if opts["col"]:
         line = colorize("cyan", line)
     return line
 
@@ -172,9 +164,33 @@ def format_error(out):
 
 j.eval("(9!:37) 0 _ 0 _")
 
+def proc(expr):
+    if opts["repr"]:
+        ret = j.do(f"last_repl_ =. {expr}")
+        res = j.getr().strip()
+        if ret == 0:
+            if len(res) > 0:  # eg. 'echo'
+                print(res)
+            out = j.eval("Repr_base_ < 'last_repl_'")
+            #j.do("last_repl_ =. (0$0)")
+        else:
+            out = j.getr()
+            msg = format_error(out)
+            raise ValueError(msg)
+    else:
+        out = j.eval(expr)
+    return out
+
+
+prompt_opts = {
+    'lexer': jlex,
+    'style': style,
+    'enable_suspend': True,
+}
+
 while True:
     try:
-        expr = session.prompt("   ", lexer=jlex, style=style, enable_suspend=True)
+        expr = session.prompt("   ", **prompt_opts)
     except (KeyboardInterrupt, EOFError):
         with open(histfile, "w") as fd:
             cmap = {ord(" "): r"\040", ord("\\"): r"\134"}
@@ -200,30 +216,19 @@ while True:
         continue
 
     try:
-        out = ""
-        if opts["repr"]:
-            ret = j.do(f"last_repl_ =. {expr}")
-            res = j.getr().strip()
-            if ret == 0:
-                if len(res) > 0:  # eg. 'echo'
-                    print(res)
-                out = j.eval("Repr < 'last_repl_'")
-                j.do("last_repl_ =. (0$0)")
-            else:
-                out = j.getr()
-                msg = format_error(out)
-                print(colorize("yellow", msg))
-                hr()
-                continue
-        else:
-            out = j.eval(expr)
+        out = proc(expr)
+    except ValueError as err:
+        print(colorize("yellow", str(err)))
+        put(hr())
+        continue
+
     except KeyboardInterrupt:
         print("SIGINT")
         continue
 
     if len(out) == 0:
         continue
-    if opts["colout"]:
+    if opts["col"]:
         tokens = lex(out, lexer=JLexer())
         fprint(PygmentsTokens(tokens), style=style, end="")
     else:
