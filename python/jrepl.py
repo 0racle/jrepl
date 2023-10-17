@@ -2,20 +2,24 @@
 
 import os
 import re
+import subprocess
 from configparser import ConfigParser, ExtendedInterpolation
-from ctypes import CDLL, c_void_p, c_char_p
+from ctypes import CDLL, c_char_p, c_void_p
+from pathlib import Path
+
+from prompt_toolkit import PromptSession
+from prompt_toolkit import print_formatted_text as fprint
+from prompt_toolkit.filters import Condition
+from prompt_toolkit.formatted_text import PygmentsTokens
+from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.lexers import PygmentsLexer
+from prompt_toolkit.styles import Style
+from prompt_toolkit.styles.pygments import style_from_pygments_cls
 from pygments import lex
+from pygments.console import colorize
 from pygments.lexers import load_lexer_from_file
 from pygments.styles import get_style_by_name
-from pygments.console import colorize
-from prompt_toolkit import PromptSession
-from prompt_toolkit.lexers import PygmentsLexer
-from prompt_toolkit.styles.pygments import style_from_pygments_cls
-from prompt_toolkit.formatted_text import PygmentsTokens
-from prompt_toolkit import print_formatted_text as fprint
-from prompt_toolkit.styles import Style
-from prompt_toolkit.history import InMemoryHistory
-from pathlib import Path
+from pygments.token import Token
 
 CURPATH = Path(__file__).parent
 localpath = lambda fname: CURPATH.joinpath(fname)
@@ -164,6 +168,7 @@ def format_error(out):
 
 j.eval("(9!:37) 0 _ 0 _")
 
+
 def proc(expr):
     if opts["repr"]:
         ret = j.do(f"last_repl_ =. {expr}")
@@ -172,7 +177,7 @@ def proc(expr):
             if len(res) > 0:  # eg. 'echo'
                 print(res)
             out = j.eval("Repr_base_ < 'last_repl_'")
-            #j.do("last_repl_ =. (0$0)")
+            # j.do("last_repl_ =. (0$0)")
         else:
             out = j.getr()
             msg = format_error(out)
@@ -182,10 +187,29 @@ def proc(expr):
     return out
 
 
+open_dd = lambda t: t == (Token.Name.Decorator, "{{")
+close_dd = lambda t: t == (Token.Name.Decorator, "}}")
+
+
+def inside_dd():
+    count = 0
+    text = session.default_buffer.text
+    for tok in lex(text, lexer=JLexer()):
+        if open_dd(tok):
+            count += 1
+        if close_dd(tok):
+            count -= 1
+    return bool(max(0, count))
+
+
+if_inside_dd = Condition(inside_dd)
+
 prompt_opts = {
-    'lexer': jlex,
-    'style': style,
-    'enable_suspend': True,
+    "lexer": jlex,
+    "style": style,
+    "enable_suspend": True,
+    "multiline": if_inside_dd,
+    "prompt_continuation": "",
 }
 
 while True:
