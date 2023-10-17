@@ -2,6 +2,7 @@
 
 from pygments.lexer import RegexLexer, include, bygroups
 from pygments.token import Token
+import re
 
 Verb = Token.Operator
 Adverb = Token.Keyword.Type
@@ -19,6 +20,27 @@ bdef_noun_multi = r"(\(+\s*)*(noun|0)\)*\s+(\(*define\)*|(def|:)\s*\(*0\)*)"
 qdef_verb_inline = r"(adverb|conjunction|verb|monad|dyad|[1-4]|13)\s+(def|:)\s*'"
 bdef_verb_multi = r"(\(+\s*)*(adverb|conjunction|verb|monad|dyad|[1-4]|13)\)*\s+(\(*define\)*|(def|:)\s*\(*0\)*)\s*"
 bqdef_verb_inline = r"(adverb|conjunction|verb|monad|dyad|[1-4]|13)\s+(def|:)\s*\('"
+
+
+def cb_unpack_in_def(lexer, match):
+    yield match.start(1), Token.Name.Function, match.group(1)
+
+    if len(match.group(2)) > 0:
+        yield match.start(2), Conjunction, match.group(2)
+
+    idx = match.start(3)
+    for n in re.findall(r"\S+\s*", match.group(3)):
+        if re.match(r"[mnxy]", n):
+            yield (idx, Noun, n)
+        elif re.match(r"[uv]", n):
+            yield (idx, Verb, n)
+        else:
+            yield (idx, Token.Literal, n)
+        idx += len(n)
+
+    yield match.start(4), Token.Name.Function, match.group(4)
+
+    yield match.start(5), Copula, match.group(5)
 
 
 class CustomLexer(RegexLexer):
@@ -71,16 +93,17 @@ class CustomLexer(RegexLexer):
         ],
         "unpack_in_def": [
             # Doesn't highlight pronoun/proverbs correctly
-            (
-                r"(')(`?)([\w\s]*)(')(\s*=[.:])",
-                bygroups(
-                    Token.Name.Function,
-                    Conjunction,
-                    Token.Literal,
-                    Token.Name.Function,
-                    Copula,
-                ),
-            )
+            # (
+            #     r"(')(`?)([\w\s]*)(')(\s*=[.:])",
+            #     bygroups(
+            #         Token.Name.Function,
+            #         Conjunction,
+            #         Token.Literal,
+            #         Token.Name.Function,
+            #         Copula,
+            #     ),
+            # )
+            (r"(')(`?)([\w\s]*)(')(\s*=[.:])", cb_unpack_in_def),
         ],
         "string": [(r"'[^']*'", Token.String)],
         "nstring": [(r"''.*?''", Token.String)],
